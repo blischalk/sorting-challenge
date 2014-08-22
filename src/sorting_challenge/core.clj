@@ -1,4 +1,6 @@
-(ns sorting-challenge.core)
+(ns sorting-challenge.core
+  (:require [clojure.java.io :as io])
+  (:gen-class))
 
 ; Create a file with 35000 records
 ; Each record with an incrementing id
@@ -10,6 +12,10 @@
 ; 3 2
 ; 4 19
 ; etc.
+
+(def default-filename
+  "generative-data.txt")
+
 
 (defn data-seq
   ([] (data-seq 20))
@@ -29,8 +35,9 @@
 
 
 (defn write-data!
-  ([data] write-data! data "generative-data.txt")
-  ([data filename] (spit filename data)))
+  ([data] write-data! data default-filename)
+  ([data filename] (doseq [line data]
+                     (spit filename line :append true))))
 
 
 (defn create-sample-data!
@@ -46,7 +53,9 @@
     (map #(Integer. %) col)))
 
 
-(defn read-data [filename] (slurp filename))
+(defn read-data
+  ([] (read-data default-filename))
+  ([filename] (slurp filename)))
 
 
 (defn find-top-rows [n data]
@@ -59,5 +68,8 @@
     (write-data! data filename)
     (find-top-rows top (parse-sample-data (read-data filename)))))
 
-
-(run 100 10 "test-data.txt")
+(defn -main [& args]
+  (let [[total top filename] args
+        result (run (Integer. total) (Integer. top) filename)]
+    (println "Your result is:")
+    (println result)))
