@@ -68,24 +68,47 @@
 
 ;(red/fold merge-func map-func (take 1000000 (repeatedly #(identity [1 2]))))
 
+(defn find-in-parallel [filename top]
+  (->> (iota/seq filename)
+       (red/map revive)
+       (red/fold (partial merge-func top) (partial map-func top))))
+
+
+(defn serial-line-func
+  [top coll line]
+  (let [[id val] (-> line
+                     (clojure.string/replace #"\n" "")
+                     (clojure.string/split #" "))
+        appended (conj coll [id val])]
+    (take top (reverse (sort-func appended)))))
+
+
+(defn find-in-serial [filename top]
+  (with-open [rdr (BufferedReader. (FileReader. filename))]
+    (reduce (partial serial-line-func top) [] (line-seq rdr))))
+
+
 (defn find-top-rows
-  ([top filename]
-     (->> (iota/seq filename)
-          (red/map revive)
-          (red/fold (partial merge-func top) (partial map-func top)))))
+  ([filename top in-parallel]
+     (if in-parallel
+       (find-in-parallel filename top)
+       (find-in-serial filename top))))
 
 
-(defn run [total top filename gen]
-  (if gen
+(defn run [filename top total in-parallel]
+  (if total
     (let [data (parse-data-to-rows total (data-seq total))]
       (write-data! data filename)))
-  (find-top-rows top filename))
+  (find-top-rows filename top in-parallel))
 
 
 (defn -main [& args]
   (time
-   (let [[total top filename gen] args
-         result (run (Integer. total) (Integer. top) filename gen)]
+   (let [[filename top total in-parallel] args
+         total (if total (Integer. total) nil)
+         top   (if top (Integer. top) nil)
+         result (run filename top total in-parallel)]
+
      (println "Your result is:")
      (println result))))
 
