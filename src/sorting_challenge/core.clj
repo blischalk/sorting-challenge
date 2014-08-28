@@ -1,5 +1,8 @@
 (ns sorting-challenge.core
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [clojure.core.reducers :as red]
+            [iota :as iota])
+  (:import (java.io BufferedReader FileReader))
   (:gen-class))
 
 ; Create a file with 35000 records
@@ -27,49 +30,67 @@
                               (repeatedly #(rand-int max-rand))
                               (repeatedly #(identity \newline))))))
 
+; Constantly (constantly \space)  == (repeatedly #(identity \space))
+
 
 (defn parse-data-to-rows [count data]
   "Convert an infinate sequence of data rows to
    finite sequence of strings"
-  (apply str (map #(apply str %) (take count data))))
+  (map #(apply str %) (take count data)))
 
 
 (defn write-data!
   ([data] write-data! data default-filename)
-  ([data filename] (doseq [line data]
-                     (spit filename line :append true))))
+  ([data filename] (do (io/delete-file filename true)
+                       (doseq [line data]
+                         (spit filename line :append true)))))
 
 
-(defn create-sample-data!
-  [row-count filename]
-  "Create a file of randomly generated rows of data"
-  (parse-data-to-rows row-count (data-seq row-count)))
+(defn revive [line]
+  (-> line
+      (clojure.string/replace #"\n" "")
+      (clojure.string/split #" ")))
 
 
-(defn parse-sample-data [data]
-  "Parse sample data into a sequence of tuples"
-  (for [col (map #(clojure.string/split % #" ")
-                 (clojure.string/split data #"\n"))]
-    (map #(Integer. %) col)))
+(defn sort-func [coll]
+  (sort-by (juxt last first) coll))
 
 
-(defn read-data
-  ([] (read-data default-filename))
-  ([filename] (slurp filename)))
+(defn map-func
+  ([top a b]
+     (take top (reverse (sort-func (conj a b))))))
 
 
-(defn find-top-rows [n data]
-  "Sort sequence of tuples and return n items"
-  (take n (sort-by last > data)))
+(defn merge-func
+  ([top] [])
+  ([top a b]
+     (take top (reverse (sort-func (concat a b))))))
+
+;(red/fold merge-func map-func (take 1000000 (repeatedly #(identity [1 2]))))
+
+(defn find-top-rows
+  ([top filename]
+     (->> (iota/seq filename)
+          (red/map revive)
+          (red/fold (partial merge-func top) (partial map-func top)))))
 
 
-(defn run [total top filename]
-  (let [data (parse-data-to-rows total (data-seq))]
-    (write-data! data filename)
-    (find-top-rows top (parse-sample-data (read-data filename)))))
+(defn run [total top filename gen]
+  (if gen
+    (let [data (parse-data-to-rows total (data-seq total))]
+      (write-data! data filename)))
+  (find-top-rows top filename))
+
 
 (defn -main [& args]
-  (let [[total top filename] args
-        result (run (Integer. total) (Integer. top) filename)]
-    (println "Your result is:")
-    (println result)))
+  (time
+   (let [[total top filename gen] args
+         result (run (Integer. total) (Integer. top) filename gen)]
+     (println "Your result is:")
+     (println result))))
+
+; Normal Reduce Timed
+; "Elapsed time: 93600.558 msecs"
+
+; Reducer Fold Timed
+; Elapsed time: 10792.479 msecs"
