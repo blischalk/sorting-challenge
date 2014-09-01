@@ -104,7 +104,7 @@
 
 (defn -main [& args]
   (time
-   (let [[filename top total in-parallel] args
+   (let [[filename top in-parallel total] args
          total (if total (Integer. total) nil)
          top   (if top (Integer. top) nil)
          result (run filename top total in-parallel)]
