@@ -1,5 +1,6 @@
 (ns sorting-challenge.core
   (:require [clojure.java.io :as io]
+            [clojure.tools.cli :refer [parse-opts]]
             [clojure.core.reducers :as red]
             [iota :as iota])
   (:import (java.io BufferedReader FileReader))
@@ -95,22 +96,38 @@
        (find-in-serial filename top))))
 
 
-(defn run [filename top total in-parallel]
-  (if total
-    (let [data (parse-data-to-rows total (data-seq total))]
-      (write-data! data filename)))
-  (find-top-rows filename top in-parallel))
+(def cli-options
+  ;; Generate a data file
+  [["-g" "--generate" "Generate a data file"]
+   ;; Set the desired results to search in file
+   ["-t" "--top TOP" "Top n results"
+    :default 5]
+   ;; Select how many rows of data to generate
+   ["-r" "--rows ROWS" "Number of rows of data to generate"
+    :default 1000
+    :parse-fn #(Integer/parseInt %)]
+   ;; Search the data file in parallel
+   ["-p" "--parallel" "Search data in parallel"]
+   ;; Help
+   ["-h" "--help"]
+   ])
 
 
 (defn -main [& args]
-  (time
-   (let [[filename top in-parallel total] args
-         total (if total (Integer. total) nil)
-         top   (if top (Integer. top) nil)
-         result (run filename top total in-parallel)]
+  (let [opts (parse-opts args cli-options)
+        options (:options opts)
+        help (:help options)
+        rows (:rows options)
+        top  (:top options)
+        parallel (:parallel options)
+        filename (first (:arguments opts))]
 
-     (println "Your result is:")
-     (println result))))
+    (if help (println (:summary opts))
+        (do (if (:generate options)
+              (write-data! (parse-data-to-rows rows (data-seq rows)) filename)
+              (time (let [result (find-top-rows filename top parallel)]
+                      (println "Your result is:")
+                      (println result))))))))
 
 ; Normal Reduce Timed
 ; "Elapsed time: 93600.558 msecs"
